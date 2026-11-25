@@ -1,0 +1,8 @@
+image_manifest_digest=sha256:9e37b8a0a42b9609fe2f0b440e615099d4de59c72afad8f32cee9b97c3e53a92
+config_digest=sha256:2fa872e3caf4fca0a9070ff8efc567f8a36d1b3278abb1df031e33c4e5c193ca
+tag=readystack/zitadel:v4.20.5-CE-ubuntu24.04-r1
+probe_port=8080
+probe_path=/debug/healthz
+probe_timeout=180
+verify_boot=skip
+verify_boot_reason=this image needs pg (not part of this archive); boot it with your own services as the admin handbook describes

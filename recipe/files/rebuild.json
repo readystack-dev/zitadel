@@ -1,0 +1,36 @@
+{
+  "bases": [
+    {
+      "digest": "sha256:79ecd0a7157c7a4cf3b281ced8465350591bf54fedab540e75374a003e1fde7e",
+      "layout": "bases/golang_1.26.11-bookworm_dc40a13b6130.oci",
+      "ref": "golang:1.26.11-bookworm@sha256:dc40a13b61304647ed7e5d581d246b86413dfc29d63c6d018310feb93cd98fc0"
+    },
+    {
+      "digest": "sha256:9a04f13b3f80ef056361e30868593b1cfd2279fe19e4081cb93a90bf56819d6a",
+      "layout": "bases/ubuntu_24.04_9c7f200c07e3.oci",
+      "ref": "ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289"
+    }
+  ],
+  "engine": {
+    "archive": "toolchain/buildkit.tar",
+    "image_digest": "sha256:e0e67ea9c4bb07bdef683e29f70f3b623d1eb9c82274a9ec04e6bb0511449fb0",
+    "kind": "buildkit",
+    "tag": "moby/buildkit:v0.31.2"
+  },
+  "inputs": {
+    "context": ".",
+    "dockerfile": "Dockerfile.offline.pinned",
+    "mtime_policy": "clamp",
+    "source_date_epoch": 1795404451,
+    "tree_hash": "sha256:5e38ff9b13918799620fa2055362cefb3d13cebd016d07f10f411250d01b0c3a"
+  },
+  "probe": {
+    "skip": "this image needs pg (not part of this archive); boot it with your own services as the admin handbook describes"
+  },
+  "schema": "readystack-rebuild-bundle/v0.1",
+  "subject": {
+    "config_digest": "sha256:2fa872e3caf4fca0a9070ff8efc567f8a36d1b3278abb1df031e33c4e5c193ca",
+    "image_manifest_digest": "sha256:9e37b8a0a42b9609fe2f0b440e615099d4de59c72afad8f32cee9b97c3e53a92",
+    "name": "docker.io/readystack/zitadel:v4.20.5-CE-ubuntu24.04-r1"
+  }
+}

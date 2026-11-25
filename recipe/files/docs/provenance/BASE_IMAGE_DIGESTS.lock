@@ -1,0 +1,2 @@
+# base images for zitadel (resolve at build_kit)
+golang:1.26.11-bookworm

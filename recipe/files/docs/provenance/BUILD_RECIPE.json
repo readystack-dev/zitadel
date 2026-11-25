@@ -1,0 +1,88 @@
+{
+  "schema": "kitforge.build_recipe.v1",
+  "slug": "zitadel",
+  "image": "readystack/zitadel:v4.20.5-CE-ubuntu24.04-r1",
+  "build_method": "source-rebuild-go",
+  "source": {
+    "repo": "https://github.com/zitadel/zitadel",
+    "ref": "v4.20.5",
+    "builder_image": "golang:1.26.11-bookworm",
+    "go_version_required": "1.25.0",
+    "_version_note": "v4.15.3 is the LATEST zitadel GA (gh api repos/zitadel/zitadel/releases/latest => v4.15.3, published 2026-06-22; commit e2886a61670ca8fd41c9434f87036546e5620bcc). go.mod directive is `go 1.25.0` / `toolchain go1.25.8`; the builder is golang:1.26-bookworm with GOTOOLCHAIN=local (set by render_l009_kit) so the current 1.26 toolchain compiles, never the stale go.mod-pinned go1.25.8 \u2014 building against the newer Go stdlib is the dominant stale-stdlib-in-binary CVE remediation. ldflags version var is github.com/zitadel/zitadel/cmd/build.version (default 'dev'); the offline stage MUST stamp -X .../cmd/build.version=v4.15.3 explicitly (the --depth-1 vendored tree has no git tag for build.go to derive from).",
+    "vendor_build": {
+      "tooling": [
+        "nodejs",
+        "unzip"
+      ],
+      "node_version": "22",
+      "cmds": [
+        "export PATH=\"${PWD}/.artifacts/bin/linux/amd64:$PATH\" GOFLAGS=-buildvcs=false GOTOOLCHAIN=local COREPACK_ENABLE_DOWNLOAD_PROMPT=0",
+        "corepack enable",
+        "pnpm install --frozen-lockfile",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install github.com/rakyll/statik@v0.1.8",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install github.com/bufbuild/buf/cmd/buf@v1.67.0",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v2.28.0",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.28.0",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install github.com/envoyproxy/protoc-gen-validate@v1.3.3",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install ./internal/protoc/protoc-gen-authoption",
+        "GOBIN=${PWD}/.artifacts/bin/linux/amd64 go install ./internal/protoc/protoc-gen-zitadel",
+        "buf generate",
+        "mkdir -p pkg/grpc openapi/v2/zitadel",
+        "cp -r .artifacts/grpc/github.com/zitadel/zitadel/pkg/grpc/** pkg/grpc/",
+        "cp -r .artifacts/grpc/zitadel/ openapi/v2/zitadel",
+        "mkdir -p apps/docs/content/apis/assets",
+        "go run internal/api/assets/generator/asset_generator.go -directory=internal/api/assets/generator/ -assets=apps/docs/content/apis/assets/assets.mdx",
+        "go generate internal/api/ui/login/static/resources/generate.go",
+        "go generate internal/api/ui/login/statik/generate.go",
+        "go generate internal/notification/statik/generate.go",
+        "go generate internal/statik/generate.go",
+        "bash ./console/scripts/install-proto-plugins.sh",
+        "(cd console && pnpm exec buf generate ../proto --include-imports --include-wkt)",
+        "pnpm exec nx run @zitadel/console:build",
+        "find internal/api/ui/console/static -mindepth 1 ! -name 'gitkeep' -delete -print",
+        "cp -r -v console/dist/console/* internal/api/ui/console/static"
+      ],
+      "_note": "GENERATED-embed materialization driven by the upstream nx project graph (there is NO top-level Makefile). Runs ONLINE in the vendor stage so all the network this needs is allowed: pnpm registry (workspace deps incl. nx/buf/sass/angular), `buf generate` -> buf.build BSR (3 proto deps pinned in proto/buf.lock: grpc-gateway, protoc-gen-validate, googleapis), and console/scripts/install-proto-plugins.sh -> 3 GitHub release binaries (protoc-gen-grpc-web 1.5.0, protoc-gen-js 4.0.2, protoc-gen-openapiv2 2.22.0; sha256-verified in the script). Ordered exactly as nx resolves: (1) pnpm install; (2) generate-install = 14 codegen tools into .artifacts/bin/linux/amd64 (gci/enumer/mockgen/stringer are go:generate-only and not needed for the binary build, so only the 10 proto/statik tools are installed \u2014 verified sufficient live); (3) generate-stubs = `buf generate` then copy .artifacts/grpc/.../pkg/grpc -> pkg/grpc + openapi; (4) generate-assets = asset_generator.go -> internal/api/assets authz.go/router.go; (5) generate-statik = login SCSS (`pnpm sass` via go:generate) + 4 statik embeds; (6) console:install-proto-plugins + console:generate (`pnpm exec buf generate ../proto --include-imports --include-wkt` -> console/src/app/proto/generated) + console:build (Angular `ng build`, the longest+heaviest step) then build-console = wipe internal/api/ui/console/static and copy console/dist/console/* in. PATH must front .artifacts/bin/linux/amd64 so buf and the protoc-gen-* plugins resolve (set in cmd[0] and re-exported because render joins with && in ONE container, preserving the export). GOFLAGS=-buildvcs=false on the go installs. After this, render_l009_kit runs `go get <dep_bumps> && go mod tidy -e && go mod vendor`; the generated pkg/grpc + statik.go + console static are main-module source files, so they survive vendoring and the offline `go build .` compiles cleanly instead of failing with the gitignored-generated-source errors. nodejs in tooling triggers the nodesource setup_22.x install + corepack in render_l009_kit's vendor apt block; node_version 22 == .nvmrc lts/jod since v4.19.5 (upstream commit 2269419, 2026-10-09: lts/iron (20, end of life) -> lts/jod to match its CI, which builds with Node 22, and testcontainers 12 in the login's dev dependencies needs Node >= 22.22; v4.19.3 and earlier were authored and verified on Node 20); pnpm@10.30.3 comes via corepack (packageManager field). Do NOT add `make`/`pnpm`/`corepack` to tooling beyond nodejs \u2014 render already apt-installs git/ca-certs/curl/gnupg/make and node+corepack from the nodejs marker.",
+      "node_dist": {
+        "version": "22.23.5",
+        "sha256": "c54118104acc524633b5abe106bbf44a53126ec8b4e5fa105cb92b5d7de8a1a1"
+      }
+    },
+    "source_date_epoch": 1795404451,
+    "source_date_epoch_provenance": "the time release v4.20.5-CE-ubuntu24.04-r1 was cut (2026-11-23T03:27:31Z), by scripts/retarget.py: ReadyStack dates an image by when its release was packaged (owner 2026-11-10), recorded here once and used by every rebuild of the release; it builds upstream commit 59827a8ec6dd, dated 2026-11-18T19:17:42Z (source.commit_epoch).",
+    "commit": "59827a8ec6dd0c23acbba5d0ebdf41fdc857d66c",
+    "commit_epoch": 1795029462,
+    "source_date_epoch_basis": "release-cut"
+  },
+  "binaries_from_source": [
+    {
+      "name": "zitadel",
+      "main_pkg": ".",
+      "cgo_enabled": 0,
+      "build_tags": [],
+      "ldflags": "-s -w -X github.com/zitadel/zitadel/cmd/build.version=v@VERSION_BARE@",
+      "out_path": "/usr/local/bin/zitadel",
+      "verify_subcmd": "--version",
+      "_note": "Single static binary. main_pkg is the repo ROOT '.' (main.go -> cmd.Execute). The version var is github.com/zitadel/zitadel/cmd/build.version (cmd/build/build.go, default 'dev'); a plain `go build` without -X reports 'dev', so the offline stage stamps -X .../cmd/build.version=v4.15.3 explicitly here (the upstream pack-platform also stamps cmd/build.commit + cmd/build.date from git, but those derive from git history the --depth-1 vendored tree lacks, so we ship only the version stamp \u2014 `zitadel --version` prints the version line). CGO_ENABLED=0 yields a fully static ELF ideal for the --network=none offline / non-root model. No build tags. VERIFIED LIVE on <redacted: internal host> (golang:1.26-bookworm, Node 20, after the vendor_build cmds): clean build (exit 0), `zitadel --version` => v4.15.3."
+    }
+  ],
+  "runtime_packages": [
+    "base-files",
+    "base-passwd",
+    "ca-certificates",
+    "coreutils",
+    "dash",
+    "libc6",
+    "libssl3t64",
+    "openssl",
+    "tzdata"
+  ],
+  "runtime_base": {
+    "kind": "chisel",
+    "shell": true,
+    "packages": "vendored/chisel/packages.tsv"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "schema": "kitforge.source_tree_hash.v1",
+  "slug": "zitadel",
+  "repo": "https://github.com/zitadel/zitadel",
+  "ref": "v4.20.5",
+  "commit": "59827a8ec6dd0c23acbba5d0ebdf41fdc857d66c",
+  "tree_listing_sha256": "1a42e40f735f7105c88afa725f146f705ff420e7138c8a29711d1c73a397fbb4",
+  "file_count": 9649
+}
